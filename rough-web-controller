@@ -1,0 +1,173 @@
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <ESP8266WebServer.h>
+ 
+#define mot1PinA 16 // Brown A-IA  DO on nodemcu
+#define mot1PinB 5  //Red  A -IB   D1 on nodemcu
+#define mot2PinA 4  // orange  B - IA  = D2 
+#define mot2PinB 0  // yellow  B-IB = D3
+
+const char* apssid = "Robot";
+const char* appassword = "0123456789";
+ESP8266WebServer server(80);
+unsigned int mspeed = 900;
+unsigned int lrspeed = 1023;
+const char webpage[] = "<html>"\
+"<head>"\
+"<title>Robot Control</title>"\
+
+"<style>"\
+          "html, body {width:85%;margin:0 auto;padding:0;background-color:#cfcbd1;text-align:center;}"\
+          ".f{display:block;}"\
+          ".rev{display:block;}"\
+          ".l{display:inline;}"\
+          ".r{display:inline;}"\
+          ".s{display:inline;}"\
+          ".fb{vertical-align:middle;width:150px;height:120px;margin:25px;background-color:#45cc5a;font-size:20px}"\
+          ".revb{vertical-align:middle;width:150px;height:120px;margin:25px;background-color:#cc45b7;font-size:20px}"\
+          ".lb{vertical-align:middle;width:150px;height:120px;margin:25px;background-color:#4574cc;font-size:20px}"\
+          ".rb{vertical-align:middle;width:150px;height:120px;margin:25px;background-color:#cc9d45;font-size:20px}"\
+          ".sb{vertical-align:middle;width:150px;height:120px;margin:25px;font-size:20px}"\
+
+          "div.container1 {"\
+          "position: relative }"\
+          
+          "top: 50%; }"\
+          "transform: translate(-50%, -50%) }"
+
+          "div.container1 p {"\
+          "width: 100% }"\
+          
+"</style>"\
+
+"<script>"\
+"function showValue(newValue)"\
+"{"\
+  "document.getElementById(""range"").innerHTML=newValue;"\
+"}"\
+"</script>"\
+
+"</head>"\
+"<body>"\
+    "<h1>July 11 2015 Robot Control</h1><br><br><br>"\
+  "<form class=\"f\" action=\"Forward\"> <input type=\"submit\" class=\"fb\" value=\"Forward\">  </form>" \
+    "<form class=\"l\" action=\"Left\"> <input type=\"submit\" class=\"lb\" value=\"Left\"> </form>"\
+    "<form class=\"s\" action=\"Stop\"> <input type=\"submit\" class=\"sb\" value=\"Stop\"> </form>"\
+    "<form class=\"r\" action=\"Right\"><input type=\"submit\" class=\"rb\" value=\"Right\"> </form>"\
+    "<form class=\"rev\"action=\"Reverse\"><input type=\"submit\" class=\"revb\" value=\"Reverse\"></form>"\
+    "<div class=container1>"\
+      "</br>"\
+      "<p>Left - Right"\
+
+        "</br>"\
+
+        "<input type=""range"" min=""0"" max=""50"" value=""25"" step=""5"" onchange=""showValue(this.value)"" />"\
+        "</br>"\
+        "<span id=""range"">Straight Ahead</span>"\
+    "</div>"\
+"</body>"\
+"</html>";
+
+void handleRoot(){server.send (200, "text/html",webpage);}
+
+void handleNotFound(){
+  String message = "File Not Found\n\n";
+  message += "URI: ";
+  message += server.uri();
+  message += "\nMethod: ";
+  message += (server.method() == HTTP_GET)?"GET":"POST";
+  message += "\nArguments: ";
+  message += server.args();
+  message += "\n";
+  for (uint8_t i=0; i<server.args(); i++){
+    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+  }
+  server.send(404, "text/plain", message);
+}
+
+void goRight(){ 
+    Serial.println("Go right");
+    analogWrite(mot1PinA, lrspeed);
+    analogWrite(mot1PinB, 0);
+    
+    analogWrite(mot2PinA, 0);
+    analogWrite(mot2PinB, lrspeed);
+    handleRoot();
+    delay(50);
+    goStop(); 
+}
+  
+void goLeft(){ 
+    Serial.println("Go Left");
+    analogWrite(mot1PinA, 0);
+    analogWrite(mot1PinB, lrspeed);
+    
+    analogWrite(mot2PinA, lrspeed);
+    analogWrite(mot2PinB, 0);
+    handleRoot();
+    delay(50);
+    goStop(); 
+}
+  
+void goForward(){ 
+    Serial.println("Go Forward");
+    analogWrite(mot1PinA, mspeed);
+    analogWrite(mot1PinB, 0);
+    
+    analogWrite(mot2PinA, mspeed);
+    analogWrite(mot2PinB, 0);
+    handleRoot();
+}
+  
+void goReverse(){ 
+    Serial.println("Go Reverse");
+    analogWrite(mot1PinA, 0);
+    analogWrite(mot1PinB, mspeed);
+    
+    analogWrite(mot2PinA, 0);
+    analogWrite(mot2PinB, mspeed);
+    handleRoot();
+}
+  
+void goStop(){ 
+    Serial.println("Go Stop");
+    analogWrite(mot1PinA, 0);
+    analogWrite(mot1PinB, 0);
+    
+    analogWrite(mot2PinA, 0);
+    analogWrite(mot2PinB, 0);
+    handleRoot();
+}
+
+void setup(void){
+  pinMode(mot1PinA, OUTPUT);
+  pinMode(mot1PinB, OUTPUT);
+  pinMode(mot2PinA, OUTPUT);
+  pinMode(mot2PinB, OUTPUT);
+  delay(1000);
+  WiFi.disconnect();
+  delay(100);
+  WiFi.mode(WIFI_AP);
+  Serial.begin(115200);
+  WiFi.softAP(apssid,appassword);
+  Serial.println("");
+  IPAddress myIP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(myIP);
+  server.on("/", handleRoot);
+  server.on("/Forward", goForward);
+  server.on("/Reverse", goReverse); 
+  server.on("/Left", goLeft);
+  server.on("/Right", goRight); 
+  server.on("/Stop", goStop);
+  server.onNotFound(handleNotFound);
+  server.begin();
+  Serial.println("HTTP server started");
+}
+ 
+void loop(void){
+  server.handleClient();
+} 
+
+
+
